@@ -1,0 +1,105 @@
+#
+# Mongo Client web Ui to acess to Mongo DB on cluster
+# Web client is now available as NOSQL Clinet Opensource toolset
+#
+# Access thru ingess url mongo-client.app.openkube.io
+#
+# Hostname: mongo-standalone.mongo.svc.cluster.local
+# Port: 27017
+# Database: admin
+#
+# AuthType: SCRAM_SHA_1
+# Username: admin (default)
+# Password: password (default)
+# Authentication DB: 
+#
+# Navigate to Tools > Shell in gui to runthe sample mongo commands
+# show dbs
+# use fluentdb
+# db.test_collection.insert({"name":"tutorials point"})
+# db.test.count()
+# db.nginx.find({ "kubernetes": { "pod_name": "virt-api-5fd554cb95-pxtrt" }})
+# show dbs
+#
+---
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-client
+  namespace: mongo
+  labels:
+    app: mongo-client 
+spec:
+  selector:
+    app: mongo-client
+  ports:
+    - port: 3000
+      name: mongoclient
+  selector:
+    app: mongo-client      
+---
+---      
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-client
+  namespace: mongo
+spec:
+  serviceName: mongo-client
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-client
+  template:
+    metadata:
+      labels:
+        app: mongo-client
+    spec:
+      containers:
+      - image: mongoclient/mongoclient:4.0.1
+        imagePullPolicy: IfNotPresent
+        name: mongoclient
+        ports:
+        - containerPort: 3000
+          name: mongoclient
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: nfs-storageclass
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: mongo-client
+  namespace: mongo
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts: 
+    - mongo-client.app.openkube.io
+    secretName: tls-mongo-client
+spec:
+  rules:
+  - host: mongo-client.app.openkube.io
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: mongo-client
+          servicePort: 3000
+---

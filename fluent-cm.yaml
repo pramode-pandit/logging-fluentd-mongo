@@ -1,0 +1,153 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+    version: v1
+data:
+  fluent.conf: |
+    ## simple source to read all logs from var log containers 
+    ## and tag them to mongo.* to be consumed my mongo DB
+    ## for continous read pos_file should be in /var/log/cont_log.pos
+    ## <source>
+    ##   @type tail
+    ##   path /var/log/containers/*nginx*.log
+    ##   pos_file /etc/cont_log.pos
+    ##   # time_format "%Y-%m-%dT%H:%M:%S.%L%Z"
+    ##   keep_time_key true
+    ##   read_from_head true
+    ##   tag mongo.*
+    ##   format json
+    ## </source>
+    ## <filter mongo.**>
+    ##     @type record_transformer
+    ##     <record>
+    ##       host_param "sdcv"
+    ##     </record>
+    ## </filter>
+    ## <match mongo.**>
+    ##   @type mongo
+    ##   host mongo-standalone.mongo.svc.cluster.local
+    ##   port 27017
+    ##   database admin
+    ##   collection nginx
+    ##   
+    ##   # for capped collection
+    ##   capped
+    ##   capped_size 1024m
+    ##   
+    ##   # authentication
+    ##   user admin
+    ##   password password
+    ##   
+    ##   <inject>
+    ##     # key name of timestamp
+    ##     time_key time
+    ##   </inject>
+    ##   
+    ##   <buffer>
+    ##     # flush
+    ##     flush_interval 10s
+    ##   </buffer>
+    ## </match>
+    ## 
+    ##
+    ## This goes for fluentd kubernetes docker image whats comes shipped with 
+    ## kubernetes filter plugin and parsers to records kubernetes updates like pod , node, and namespaces
+    ##
+    ##
+    @include kubernetes.conf
+    ##
+    <filter kubernetes.**>
+      @type record_transformer
+      remove_keys stream,$.kubernetes.master_url,$.kubernetes.namespace_id,$.kubernetes.container_image_id
+    </filter>
+    ##
+    ##
+    <match kubernetes.**>
+      @type rewrite_tag_filter
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^calico-/   
+        tag mongo.audit_calico
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^coredns-/   
+        tag mongo.audit_coredns
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^etcd-/   
+        tag mongo.audit_etcd
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^kube-apiserver-/   
+        tag mongo.audit_kube-apiserver
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^kube-controller-manager/   
+        tag mongo.audit_kube-controller-manager
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^kube-proxy/   
+        tag mongo.audit_kube-proxy
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^kube-scheduler/   
+        tag mongo.audit_kube-scheduler
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /haproxy-kubernetes-ingress/   
+        tag mongo.audit_haproxy-ingress
+      </rule>
+      <rule>
+        key $.kubernetes.pod_name
+        pattern  /^nfs/   
+        tag mongo.audit_nfs
+      </rule>
+      <rule>
+        key log
+        pattern /^(.*)$/
+        tag mongo.workloads
+      </rule>
+    </match>
+    ##
+    ##
+    <match mongo.**>
+      @type mongo
+      @log_level info
+      # host mongo-standalone.mongo.svc.cluster.local
+      # port 27017
+      # database admin
+      host "#{ENV['FLUENT_MONGO_HOST']}"
+      port "#{ENV['FLUENT_MONGO_PORT']}"
+      database "#{ENV['FLUENT_MONGO_DB']}"
+      #
+      # Set 'tag_mapped' if you want to use tag mapped mode.
+      tag_mapped
+      #
+      # If the tag is "mongo.foo", then the prefix "mongo." is removed.
+      # The inserted collection name is "foo".
+      remove_tag_prefix mongo.
+      #
+      # This configuration is used if the tag is not found. The default is 'untagged'
+      collection kubernetes
+      #
+      # authentication
+      user "#{ENV['FLUENT_MONGO_USER']}"
+      password "#{ENV['FLUENT_MONGO_PASSWORD']}"
+      #
+      # flush
+      <buffer>
+        flush_interval 10s
+      </buffer>
+    </match>
+    
