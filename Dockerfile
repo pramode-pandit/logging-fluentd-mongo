@@ -23,7 +23,7 @@
 # CMD ["fluentd"]
 #
 #
-#
+# Fluentd with mongo
 # https://github.com/fluent/fluentd-kubernetes-daemonset/tree/master/docker-image/v1.9/debian-forward
 # kubernetes daemonset has preinstalled kubernetes filter plugins that fetches information like podID, namespace, nodeName and others
 #
