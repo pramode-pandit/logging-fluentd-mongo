@@ -24,18 +24,31 @@ docker build . -t fluend-kubernetes:v1.9-debian-mongo
 
 ##### Deploy Mongo DB to store logs
 
+Create namespace
+```
+cat << EOF | kubectl apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mongo
+EOF
+```
+
+Deploy mongo db and client ui
 ```
 kubectl apply -f mongo.stateful.standalone.yaml
+kubectl apply -f mongo.client.yaml
 ```
 
-##### Deploy Mongo Client
+Create Mongo Client Ingress to access ui
 
-Run the `certs.sh` to generate certificates and secret to be consumed by ingress tls
 
 ```
+# Run the `certs.sh` to generate certificates and secret for the ingress tls
+
 sh certs.sh
 
-kubectl apply -f mongo.client.yaml
+kubectl apply -f mongo.client.ingress.yaml
 ```
 
 ##### Deploy fluentd daemonset and fluent config map
@@ -47,14 +60,18 @@ kubectl get pods -A  -l k8s-app=fluentd-logging -o wide
 
 ##### View Logs
 
-Open the mongo ui either thru the configured ingress url or via kubectl port-forward to mongo-client pod
+Open the mongo ui either thru the configured ingress url or 
+via kubectl port-forward to mongo-client pod
 
-View the `mongo.client.yaml` comment to get info on default user password and setting up the authentication 
+View the `mongo.client.yaml` comment to get info on default 
+user password and setting up the authentication 
 
-Navigate to Tools > Shell in gui to run the  mongo commands to play around with the data
+Navigate to Tools > Shell in gui to run the  mongo commands to 
+play around with the data
 
 ##### Reference
-Below are the link to the official fluentd-kubernetes-daemonset yamls and docker repository for more insight
+Below are the link to the official fluentd-kubernetes-daemonset 
+yamls and docker repository for more insight
 
 > https://github.com/fluent/fluentd-kubernetes-daemonset/tree/master/docker-image/v1.9/debian-forward
 > https://github.com/fluent/fluent-plugin-mongo
